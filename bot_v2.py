@@ -1,8 +1,8 @@
 """
-Telegram Bulk Approve Bot v3.0
+Telegram Bulk Approve Bot v4.0
 ==============================
-Compatible na Python 3.13 + python-telegram-bot 21.x
-Approve watu 5 kwa wakati — natural kama binadamu!
+Railway Compatible - PTB 20.3
+Approve watu 5 kwa wakati - natural kama binadamu!
 """
 
 import logging
@@ -11,7 +11,7 @@ import random
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
-    Application,
+    ApplicationBuilder,
     ChatJoinRequestHandler,
     CommandHandler,
     CallbackQueryHandler,
@@ -81,7 +81,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_ID:
         return
     await update.message.reply_text(
-        "👋 *Karibu Approve Bot v3.0!*\n\n"
+        "👋 *Karibu Approve Bot v4.0!*\n\n"
         "📌 Amri:\n"
         "• /requests — Ona requests\n"
         "• /stats — Takwimu\n"
@@ -118,7 +118,7 @@ async def show_requests(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 # =============================
-# Approve All
+# Approve All - Batch ya 5
 # =============================
 async def approve_all(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global is_approving
@@ -173,6 +173,7 @@ async def approve_all(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 logger.error(f"Imeshindwa: {info['name']}: {e}")
                 failed += 1
 
+        # Progress update kila batches 10
         if batch_num % 10 == 0 or batch_num == total_batches:
             try:
                 done = success + failed
@@ -335,12 +336,12 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # MAIN
 # =============================
 def main():
-    print("🤖 Approve Bot v3.0 inaanza...")
+    print("🤖 Approve Bot v4.0 inaanza...")
     print(f"👤 Admin ID: {ADMIN_ID}")
     print(f"⚡ Batch: {BATCH_SIZE} | Delay: {DELAY_MIN}-{DELAY_MAX}s")
     print("📢 Inangoja join requests...\n")
 
-    app = Application.builder().token(BOT_TOKEN).build()
+    app = ApplicationBuilder().token(BOT_TOKEN).build()
 
     app.add_handler(ChatJoinRequestHandler(collect_request))
     app.add_handler(CommandHandler("start", start))
@@ -352,7 +353,10 @@ def main():
     app.add_handler(CallbackQueryHandler(approve_one, pattern="^approve_one_"))
     app.add_handler(CallbackQueryHandler(back_to_main, pattern="^back_to_main$"))
 
-    app.run_polling(allowed_updates=["chat_join_request", "message", "callback_query"])
+    app.run_polling(
+        allowed_updates=["chat_join_request", "message", "callback_query"],
+        drop_pending_updates=True
+    )
 
 
 if __name__ == "__main__":
