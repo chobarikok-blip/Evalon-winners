@@ -11,6 +11,7 @@ import asyncio
 import random
 import os
 from datetime import datetime
+from aiohttp import web
 
 import psycopg2
 import psycopg2.extras
@@ -489,6 +490,21 @@ async def history(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 # =============================
+# WEB SERVER (keeps Render alive)
+# =============================
+async def health(request):
+    return web.Response(text="Bot is running ✅")
+
+async def run_web_server():
+    port = int(os.environ.get("PORT", 8080))
+    runner = web.AppRunner(web.Application())
+    await runner.setup()
+    runner.app.router.add_get("/", health)
+    site = web.TCPSite(runner, "0.0.0.0", port)
+    await site.start()
+    print(f"🌐 Web server running on port {port}")
+
+# =============================
 # MAIN - asyncio.run() for Python 3.14
 # =============================
 async def main():
@@ -501,6 +517,8 @@ async def main():
 
     print(f"📦 Loaded {len(pending_requests)} pending requests from DB.")
     print("📢 Waiting for join requests...\n")
+
+    await run_web_server()
 
     app = ApplicationBuilder().token(BOT_TOKEN).build()
 
