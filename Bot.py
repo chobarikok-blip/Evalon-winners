@@ -1,7 +1,7 @@
 """
 Telegram Bulk Approve Bot v4.0
 ==============================
-Render Compatible - PTB 20.3
+Render Compatible - PTB 21.9
 Approve 5 users at a time - naturally like a human!
 PostgreSQL (Neon) powered - persistent storage.
 """
