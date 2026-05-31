@@ -497,9 +497,10 @@ async def health(request):
 
 async def run_web_server():
     port = int(os.environ.get("PORT", 8080))
-    runner = web.AppRunner(web.Application())
+    web_app = web.Application()
+    web_app.router.add_get("/", health)
+    runner = web.AppRunner(web_app)
     await runner.setup()
-    runner.app.router.add_get("/", health)
     site = web.TCPSite(runner, "0.0.0.0", port)
     await site.start()
     print(f"🌐 Web server running on port {port}")
@@ -518,7 +519,6 @@ async def main():
     print(f"📦 Loaded {len(pending_requests)} pending requests from DB.")
     print("📢 Waiting for join requests...\n")
 
-    await run_web_server()
 
     app = ApplicationBuilder().token(BOT_TOKEN).build()
 
