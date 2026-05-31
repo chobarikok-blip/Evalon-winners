@@ -1,13 +1,14 @@
 """
 Telegram Bulk Approve Bot v4.0
 ==============================
-Railway Compatible - PTB 20.3
-Approve watu 5 kwa wakati - natural kama binadamu!
+Render Compatible - PTB 20.3
+Approve 5 users at a time - naturally like a human!
 """
 
 import logging
 import asyncio
 import random
+import os
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
@@ -19,9 +20,9 @@ from telegram.ext import (
 )
 
 # =============================
-# MIPANGILIO
+# CONFIGURATION
 # =============================
-BOT_TOKEN = "8714717705:AAFaVeyp1OQIbkM3C3wb7qT7OzuCsMR5KmA"
+BOT_TOKEN = os.environ.get("BOT_TOKEN", "")
 ADMIN_ID = 8054370971
 BATCH_SIZE = 5
 DELAY_MIN = 0.5
@@ -37,14 +38,14 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # =============================
-# HIFADHI
+# STORAGE
 # =============================
 pending_requests: dict = {}
 is_approving = False
 
 
 # =============================
-# KUSANYA REQUESTS
+# COLLECT REQUESTS
 # =============================
 async def collect_request(update: Update, context: ContextTypes.DEFAULT_TYPE):
     join_request = update.chat_join_request
@@ -53,25 +54,25 @@ async def collect_request(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     pending_requests[user.id] = {
         "name": user.full_name,
-        "username": f"@{user.username}" if user.username else "Hana username",
+        "username": f"@{user.username}" if user.username else "No username",
         "chat_id": chat_id,
     }
 
-    logger.info(f"Request mpya: {user.full_name} | Jumla: {len(pending_requests)}")
+    logger.info(f"New request: {user.full_name} | Total: {len(pending_requests)}")
 
     try:
         await context.bot.send_message(
             chat_id=ADMIN_ID,
             text=(
-                f"📥 *Request mpya!*\n"
+                f"📥 *New Request!*\n"
                 f"👤 {user.full_name}\n"
-                f"📊 Zinasubiri: *{len(pending_requests)}*\n\n"
-                f"Tuma /requests kuona zote."
+                f"📊 Pending: *{len(pending_requests)}*\n\n"
+                f"Send /requests to view all."
             ),
             parse_mode="Markdown"
         )
     except Exception as e:
-        logger.warning(f"Notify imeshindwa: {e}")
+        logger.warning(f"Notification failed: {e}")
 
 
 # =============================
@@ -81,11 +82,11 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_ID:
         return
     await update.message.reply_text(
-        "👋 *Karibu Approve Bot v4.0!*\n\n"
-        "📌 Amri:\n"
-        "• /requests — Ona requests\n"
-        "• /stats — Takwimu\n"
-        "• /stop — Simamisha approve",
+        "👋 *Welcome to Approve Bot v4.0!*\n\n"
+        "📌 Commands:\n"
+        "• /requests — View requests\n"
+        "• /stats — Statistics\n"
+        "• /stop — Stop approving",
         parse_mode="Markdown"
     )
 
@@ -99,26 +100,26 @@ async def show_requests(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     count = len(pending_requests)
     if count == 0:
-        await update.message.reply_text("✅ Hakuna requests zinazosubiri.")
+        await update.message.reply_text("✅ No pending requests.")
         return
 
     mins = int((count / BATCH_SIZE) * ((DELAY_MIN + DELAY_MAX) / 2) / 60)
     keyboard = [[
         InlineKeyboardButton(f"🚀 Approve All ({count})", callback_data="approve_all"),
-        InlineKeyboardButton("👤 Approve Baadhi", callback_data="approve_select_page_0"),
+        InlineKeyboardButton("👤 Approve Some", callback_data="approve_select_page_0"),
     ]]
 
     await update.message.reply_text(
         f"📋 *Requests: {count}*\n"
-        f"⏱ Muda wa kukamilisha: ~dakika *{mins}*\n\n"
-        f"Chagua hatua:",
+        f"⏱ Estimated time: ~*{mins}* minutes\n\n"
+        f"Choose an action:",
         parse_mode="Markdown",
         reply_markup=InlineKeyboardMarkup(keyboard),
     )
 
 
 # =============================
-# Approve All - Batch ya 5
+# Approve All - Batch of 5
 # =============================
 async def approve_all(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global is_approving
@@ -129,11 +130,11 @@ async def approve_all(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     if is_approving:
-        await query.answer("⚠️ Approve inaendelea! Tuma /stop kwanza.", show_alert=True)
+        await query.answer("⚠️ Approval in progress! Send /stop first.", show_alert=True)
         return
 
     if not pending_requests:
-        await query.edit_message_text("✅ Hakuna requests za ku-approve.")
+        await query.edit_message_text("✅ No requests to approve.")
         return
 
     is_approving = True
@@ -142,9 +143,9 @@ async def approve_all(update: Update, context: ContextTypes.DEFAULT_TYPE):
     failed = 0
 
     status_msg = await query.edit_message_text(
-        f"🚀 *Inaanza approve {total} watu...*\n"
-        f"⚡ Batch: {BATCH_SIZE} kwa wakati\n"
-        f"⏳ Subiri...",
+        f"🚀 *Starting approval for {total} users...*\n"
+        f"⚡ Batch: {BATCH_SIZE} at a time\n"
+        f"⏳ Please wait...",
         parse_mode="Markdown"
     )
 
@@ -170,21 +171,21 @@ async def approve_all(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 del pending_requests[user_id]
                 success += 1
             except Exception as e:
-                logger.error(f"Imeshindwa: {info['name']}: {e}")
+                logger.error(f"Failed: {info['name']}: {e}")
                 failed += 1
 
-        # Progress update kila batches 10
+        # Progress update every 10 batches
         if batch_num % 10 == 0 or batch_num == total_batches:
             try:
                 done = success + failed
                 percent = int(done / total * 100)
                 bar = "█" * (percent // 10) + "░" * (10 - percent // 10)
                 await status_msg.edit_text(
-                    f"⚡ *Inakubali...*\n\n"
+                    f"⚡ *Approving...*\n\n"
                     f"[{bar}] {percent}%\n\n"
                     f"✅ Approved: *{success}*\n"
-                    f"❌ Imeshindwa: *{failed}*\n"
-                    f"⏳ Zilizobaki: *{len(pending_requests)}*",
+                    f"❌ Failed: *{failed}*\n"
+                    f"⏳ Remaining: *{len(pending_requests)}*",
                     parse_mode="Markdown"
                 )
             except Exception:
@@ -196,16 +197,16 @@ async def approve_all(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     try:
         await status_msg.edit_text(
-            f"🎉 *Imekamilika!*\n\n"
-            f"✅ Waliopita: *{success}*\n"
-            f"❌ Walishindwa: *{failed}*\n"
-            f"📊 Zilizobaki: *{len(pending_requests)}*",
+            f"🎉 *Done!*\n\n"
+            f"✅ Approved: *{success}*\n"
+            f"❌ Failed: *{failed}*\n"
+            f"📊 Remaining: *{len(pending_requests)}*",
             parse_mode="Markdown"
         )
     except Exception:
         await context.bot.send_message(
             chat_id=ADMIN_ID,
-            text=f"🎉 Imekamilika!\n✅ {success} walipita\n❌ {failed} walishindwa"
+            text=f"🎉 Done!\n✅ {success} approved\n❌ {failed} failed"
         )
 
 
@@ -217,17 +218,17 @@ async def stop_approving(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_ID:
         return
     if not is_approving:
-        await update.message.reply_text("ℹ️ Hakuna approve inayoendelea.")
+        await update.message.reply_text("ℹ️ No approval is currently running.")
         return
     is_approving = False
     await update.message.reply_text(
-        f"🛑 *Imesimamishwa!*\n📊 Zilizobaki: *{len(pending_requests)}*",
+        f"🛑 *Stopped!*\n📊 Remaining: *{len(pending_requests)}*",
         parse_mode="Markdown"
     )
 
 
 # =============================
-# Approve Baadhi
+# Approve Some
 # =============================
 PAGE_SIZE = 5
 
@@ -243,7 +244,7 @@ async def show_select_page(update: Update, context: ContextTypes.DEFAULT_TYPE):
     total = len(users)
 
     if total == 0:
-        await query.edit_message_text("✅ Hakuna requests zilizobaki.")
+        await query.edit_message_text("✅ No requests remaining.")
         return
 
     start_idx = page * PAGE_SIZE
@@ -257,15 +258,15 @@ async def show_select_page(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     nav = []
     if page > 0:
-        nav.append(InlineKeyboardButton("⬅️ Nyuma", callback_data=f"approve_select_page_{page-1}"))
+        nav.append(InlineKeyboardButton("⬅️ Back", callback_data=f"approve_select_page_{page-1}"))
     if end_idx < total:
-        nav.append(InlineKeyboardButton("Mbele ➡️", callback_data=f"approve_select_page_{page+1}"))
+        nav.append(InlineKeyboardButton("Next ➡️", callback_data=f"approve_select_page_{page+1}"))
     if nav:
         keyboard.append(nav)
-    keyboard.append([InlineKeyboardButton("🔙 Rudi", callback_data="back_to_main")])
+    keyboard.append([InlineKeyboardButton("🔙 Main Menu", callback_data="back_to_main")])
 
     await query.edit_message_text(
-        f"👤 *Chagua mtu:* {start_idx+1}–{end_idx} kati ya {total}",
+        f"👤 *Select a user:* {start_idx+1}–{end_idx} of {total}",
         parse_mode="Markdown",
         reply_markup=InlineKeyboardMarkup(keyboard),
     )
@@ -280,7 +281,7 @@ async def approve_one(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     user_id = int(query.data.split("_")[-1])
     if user_id not in pending_requests:
-        await query.answer("⚠️ Hayupo tena kwenye orodha.", show_alert=True)
+        await query.answer("⚠️ User is no longer in the list.", show_alert=True)
         return
 
     info = pending_requests[user_id]
@@ -290,9 +291,9 @@ async def approve_one(update: Update, context: ContextTypes.DEFAULT_TYPE):
             user_id=user_id
         )
         del pending_requests[user_id]
-        await query.answer(f"✅ {info['name']} amekubaliwa!")
+        await query.answer(f"✅ {info['name']} has been approved!")
     except Exception as e:
-        await query.answer(f"❌ Imeshindwa: {e}", show_alert=True)
+        await query.answer(f"❌ Failed: {e}", show_alert=True)
         return
 
     query.data = "approve_select_page_0"
@@ -306,11 +307,11 @@ async def back_to_main(update: Update, context: ContextTypes.DEFAULT_TYPE):
     count = len(pending_requests)
     keyboard = [[
         InlineKeyboardButton(f"🚀 Approve All ({count})", callback_data="approve_all"),
-        InlineKeyboardButton("👤 Approve Baadhi", callback_data="approve_select_page_0"),
+        InlineKeyboardButton("👤 Approve Some", callback_data="approve_select_page_0"),
     ]]
 
     await query.edit_message_text(
-        f"📋 *Requests: {count}*\n\nChagua hatua:",
+        f"📋 *Requests: {count}*\n\nChoose an action:",
         parse_mode="Markdown",
         reply_markup=InlineKeyboardMarkup(keyboard),
     )
@@ -322,12 +323,12 @@ async def back_to_main(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_ID:
         return
-    status = "🟢 Inafanya kazi" if is_approving else "🔴 Imesimama"
+    status = "🟢 Running" if is_approving else "🔴 Stopped"
     await update.message.reply_text(
-        f"📊 *Takwimu:*\n\n"
-        f"⏳ Zinasubiri: *{len(pending_requests)}*\n"
-        f"⚙️ Hali: {status}\n"
-        f"⚡ Batch: *{BATCH_SIZE}* kwa wakati",
+        f"📊 *Statistics:*\n\n"
+        f"⏳ Pending: *{len(pending_requests)}*\n"
+        f"⚙️ Status: {status}\n"
+        f"⚡ Batch: *{BATCH_SIZE}* at a time",
         parse_mode="Markdown"
     )
 
@@ -336,10 +337,10 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # MAIN
 # =============================
 def main():
-    print("🤖 Approve Bot v4.0 inaanza...")
+    print("🤖 Approve Bot v4.0 starting...")
     print(f"👤 Admin ID: {ADMIN_ID}")
     print(f"⚡ Batch: {BATCH_SIZE} | Delay: {DELAY_MIN}-{DELAY_MAX}s")
-    print("📢 Inangoja join requests...\n")
+    print("📢 Waiting for join requests...\n")
 
     app = ApplicationBuilder().token(BOT_TOKEN).build()
 
