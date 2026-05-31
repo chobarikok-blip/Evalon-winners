@@ -513,6 +513,9 @@ async def main():
     print(f"👤 Admin ID: {ADMIN_ID}")
     print(f"⚡ Batch: {BATCH_SIZE} | Delay: {DELAY_MIN}-{DELAY_MAX}s")
 
+    # Start web server FIRST so Render sees the port immediately
+    await run_web_server()
+
     init_db()
     load_pending_from_db()
 
