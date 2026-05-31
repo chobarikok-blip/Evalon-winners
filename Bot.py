@@ -1,7 +1,7 @@
 """
 Telegram Bulk Approve Bot v4.0
 ==============================
-Render Compatible - PTB 21.9
+Render Compatible - PTB 21.9 / Python 3.14
 Approve 5 users at a time - naturally like a human!
 PostgreSQL (Neon) powered - persistent storage.
 """
@@ -57,7 +57,6 @@ def get_conn():
 
 
 def init_db():
-    """Create tables if they don't exist."""
     with get_conn() as conn:
         with conn.cursor() as cur:
             cur.execute("""
@@ -88,18 +87,16 @@ def init_db():
                 );
             """)
         conn.commit()
-    logger.info("✅ Database tables ready.")
+    logger.info("Database tables ready.")
 
 
 def load_pending_from_db():
-    """Load pending requests from DB into memory on startup."""
     global pending_requests
     pending_requests = {}
     with get_conn() as conn:
         with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur:
             cur.execute("SELECT user_id, name, username, chat_id FROM pending_requests;")
-            rows = cur.fetchall()
-            for row in rows:
+            for row in cur.fetchall():
                 pending_requests[row["user_id"]] = {
                     "name": row["name"],
                     "username": row["username"],
@@ -238,7 +235,7 @@ async def show_requests(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 # =============================
-# Approve All - Batch of 5
+# Approve All
 # =============================
 async def approve_all(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global is_approving
@@ -295,7 +292,6 @@ async def approve_all(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 logger.error(f"Failed: {info['name']}: {e}")
                 failed += 1
 
-        # Progress update every 10 batches
         if batch_num % 10 == 0 or batch_num == total_batches:
             try:
                 done = success + failed
@@ -493,9 +489,9 @@ async def history(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 # =============================
-# MAIN
+# MAIN - asyncio.run() for Python 3.14
 # =============================
-def main():
+async def main():
     print("🤖 Approve Bot v4.0 starting...")
     print(f"👤 Admin ID: {ADMIN_ID}")
     print(f"⚡ Batch: {BATCH_SIZE} | Delay: {DELAY_MIN}-{DELAY_MAX}s")
@@ -519,11 +515,17 @@ def main():
     app.add_handler(CallbackQueryHandler(approve_one, pattern="^approve_one_"))
     app.add_handler(CallbackQueryHandler(back_to_main, pattern="^back_to_main$"))
 
-    app.run_polling(
-        allowed_updates=["chat_join_request", "message", "callback_query"],
-        drop_pending_updates=True
-    )
+    async with app:
+        await app.initialize()
+        await app.start()
+        await app.updater.start_polling(
+            allowed_updates=["chat_join_request", "message", "callback_query"],
+            drop_pending_updates=True
+        )
+        await asyncio.Event().wait()
+        await app.updater.stop()
+        await app.stop()
 
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())
